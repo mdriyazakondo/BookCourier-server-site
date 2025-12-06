@@ -31,6 +31,14 @@ async function run() {
     const bookCollection = db.collection("books");
 
     //========= User api ============//
+    app.get("/all-users/:email", async (req, res) => {
+      const adminEmail = req.params.email;
+      const result = await userCollection
+        .find({ email: { $ne: adminEmail } })
+        .toArray();
+      res.send(result);
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const result = await userCollection.findOne({ email });
@@ -54,12 +62,27 @@ async function run() {
       res.send(result);
     });
 
+    // user profile update
     app.patch("/users/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateUser = req.body;
       const updateProfile = { name: updateUser.name, image: updateUser.image };
       const updateDoc = { $set: updateProfile };
+      const result = await userCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    //User Role Update
+    app.patch("/user-role", async (req, res) => {
+      const email = req.body.email;
+      const query = { email: email };
+      const roleUpdate = req.body;
+      const updateDoc = {
+        $set: {
+          role: roleUpdate.role,
+        },
+      };
       const result = await userCollection.updateOne(query, updateDoc);
       res.send(result);
     });
