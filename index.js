@@ -29,6 +29,7 @@ async function run() {
     const db = client.db("BookCourier_Library_System");
     const userCollection = db.collection("users");
     const bookCollection = db.collection("books");
+    const orderCollection = db.collection("orders");
 
     //========= User api ============//
     app.get("/all-users/:email", async (req, res) => {
@@ -147,6 +148,24 @@ async function run() {
         },
       };
       const result = await bookCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    //====== Order Boook ========//
+    app.get("/orders/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await orderCollection
+        .find({ customerEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    app.post("/orders", async (req, res) => {
+      const newOrder = req.body;
+      newOrder.status = "pending";
+      newOrder.paymentStatus = "unpaid";
+      newOrder.order_date = new Date();
+      const result = await orderCollection.insertOne(newOrder);
       res.send(result);
     });
 
