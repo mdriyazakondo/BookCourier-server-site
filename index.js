@@ -2,8 +2,34 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const stripe = require("stripe")(process.env.STRIPE_SECURET);
 const app = express();
 
+const admin = require("firebase-admin");
+
+const decoded = Buffer.from(
+  process.env.FIRE_BASE_SECURET_KEY,
+  "base64"
+).toString("utf-8");
+const serviceAccount = JSON.parse(decoded);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const verifyJWT = async (req, res, next) => {
+  const token = req?.headers?.authorization?.split(" ")[1];
+  console.log(token);
+  if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.tokenEmail = decoded.email;
+    console.log(decoded);
+    next();
+  } catch (err) {
+    console.log(err);
+    return res.status(401).send({ message: "Unauthorized Access!", err });
+  }
+};
 //======= middleware ===========//
 app.use(express.json());
 app.use(
@@ -13,6 +39,8 @@ app.use(
     optionSuccessStatus: 200,
   })
 );
+
+//========= firebase ========//
 
 //========= mongodb connect =========//
 const uri = process.env.MONGODB_URI;
@@ -30,6 +58,7 @@ async function run() {
     const userCollection = db.collection("users");
     const bookCollection = db.collection("books");
     const orderCollection = db.collection("orders");
+    const paymentCollection = db.collection("payments");
 
     //========= User api ============//
     app.get("/all-users/:email", async (req, res) => {
@@ -167,6 +196,87 @@ async function run() {
       newOrder.order_date = new Date();
       const result = await orderCollection.insertOne(newOrder);
       res.send(result);
+    });
+
+    //==== payment releted api ========//
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.price) * 100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: {
+                name: paymentInfo.name,
+              },
+            },
+
+            quantity: 1,
+          },
+        ],
+        customer_email: paymentInfo.customerEmail,
+        mode: "payment",
+        metadata: {
+          orderId: paymentInfo._id,
+        },
+        success_url: `${process.env.SITE_DOMIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMIN}/dashboard/my-orders`,
+      });
+      res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      const orderId = session?.metadata?.orderId;
+      const orderQuery = { _id: new ObjectId(orderId) };
+
+      const books = await orderCollection.findOne(orderQuery);
+
+      const existingPayment = await paymentCollection.findOne({
+        transationId: session.payment_intent,
+      });
+
+      // If payment exists → prevent duplicate insert
+      if (existingPayment) {
+        return res.send({
+          message: "Payment already processed",
+          transationId: existingPayment.transationId,
+        });
+      }
+
+      if (session.payment_status === "paid" && books) {
+        const orderInfo = {
+          orderId: orderId,
+          transationId: session.payment_intent,
+          bookName: books.name,
+          customer_email: session.customer_email,
+          customer_name: books.customerName,
+          payment_date: new Date(),
+          price: session.amount_total / 100,
+        };
+
+        const result = await paymentCollection.insertOne(orderInfo);
+
+        await orderCollection.updateOne(orderQuery, {
+          $set: { paymentStatus: session.payment_status },
+          $inc: { quantity: -1 },
+        });
+
+        return res.send({
+          transationId: session.payment_intent,
+          orderId: result.insertedId,
+        });
+      }
+
+      res.send({
+        transationId: session.payment_intent,
+        orderId: result._id,
+      });
     });
 
     await client.db("admin").command({ ping: 1 });
