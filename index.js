@@ -69,6 +69,17 @@ async function run() {
       res.send(result);
     });
 
+    // GET /user/role?email=user@example.com
+    app.get("/user/role", async (req, res) => {
+      const email = req.query.email;
+      if (!email) return res.status(400).send({ error: "Email is required" });
+
+      const user = await userCollection.findOne({ email });
+      if (!user) return res.status(404).send({ error: "User not found" });
+
+      res.send({ role: user.role });
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const result = await userCollection.findOne({ email });
