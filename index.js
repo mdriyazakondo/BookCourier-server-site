@@ -18,12 +18,12 @@ admin.initializeApp({
 
 const verifyJWT = async (req, res, next) => {
   const token = req?.headers?.authorization?.split(" ")[1];
-  console.log(token);
+
   if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
-    console.log(decoded);
+
     next();
   } catch (err) {
     console.log(err);
@@ -58,7 +58,27 @@ async function run() {
     const orderCollection = db.collection("orders");
     const paymentCollection = db.collection("payments");
 
-    //========= User api ============//
+    //======= Role Middleware ==========//
+    const verifyADMIN = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await userCollection.findOne({ email });
+      if (users?.role !== "admin")
+        return res
+          .status(403)
+          .seler({ message: "Admin Only Actions", role: users?.role });
+      next();
+    };
+    const verifyLibrarian = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const users = await userCollection.findOne({ email });
+      if (users?.role !== "Librarian")
+        return res
+          .status(403)
+          .seler({ message: "Seller Only Actions", role: users?.role });
+      next();
+    };
+
+    //========= User api ============// !! TODO
     app.get("/all-users/:email", verifyJWT, async (req, res) => {
       const adminEmail = req.params.email;
       const result = await userCollection
@@ -113,7 +133,7 @@ async function run() {
     });
 
     //User Role Update
-    app.patch("/user-role", verifyJWT, async (req, res) => {
+    app.patch("/user-role", verifyJWT, verifyADMIN, async (req, res) => {
       const email = req.body.email;
       const query = { email: email };
       const roleUpdate = req.body;
@@ -128,8 +148,9 @@ async function run() {
 
     //========= latest books ===========//
     app.get("/latest", async (req, res) => {
+      const publish = "published";
       const result = await bookCollection
-        .find()
+        .find({ status: publish })
         .sort({ create_date: -1 })
         .limit(8)
         .toArray();
@@ -138,6 +159,15 @@ async function run() {
 
     //============ book create releted api ===========//
     app.get("/books", async (req, res) => {
+      const publish = "published";
+      const result = await bookCollection
+        .find({ status: publish })
+        .sort({ create_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/mange-books", verifyJWT, verifyADMIN, async (req, res) => {
       const result = await bookCollection
         .find()
         .sort({ create_date: -1 })
@@ -145,13 +175,18 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/my-books/:email", verifyJWT, async (req, res) => {
-      const email = req.params.email;
-      const result = await bookCollection
-        .find({ authorEmail: email })
-        .toArray();
-      res.send(result);
-    });
+    app.get(
+      "/my-books/:email",
+      verifyJWT,
+      verifyLibrarian,
+      async (req, res) => {
+        const email = req.params.email;
+        const result = await bookCollection
+          .find({ authorEmail: email })
+          .toArray();
+        res.send(result);
+      }
+    );
     app.get("/books/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -159,14 +194,14 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/books", verifyJWT, async (req, res) => {
+    app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const newBook = req.body;
       newBook.create_date = new Date();
       const result = await bookCollection.insertOne(newBook);
       res.send(result);
     });
 
-    app.put("/books/:id", verifyJWT, async (req, res) => {
+    app.put("/books/:id", verifyJWT, verifyLibrarian, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateBook = req.body;
@@ -175,14 +210,14 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/books/:id", verifyJWT, async (req, res) => {
+    app.delete("/books/:id", verifyJWT, verifyLibrarian, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await bookCollection.deleteOne(query);
       res.send(result);
     });
 
-    //==== publish and unpublish =========//
+    //==== publish and unpublish =========// !! TODO
     app.patch("/books/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -196,13 +231,18 @@ async function run() {
     });
 
     //====== Order Boook ========//
-    app.get("/orders/:email/payments", verifyJWT, async (req, res) => {
-      const email = req.params.email;
-      const result = await orderCollection
-        .find({ authorEmail: email, paymentStatus: "paid" })
-        .toArray();
-      res.send(result);
-    });
+    app.get(
+      "/orders/:email/payments",
+      verifyJWT,
+      verifyLibrarian,
+      async (req, res) => {
+        const email = req.params.email;
+        const result = await orderCollection
+          .find({ authorEmail: email, paymentStatus: "paid" })
+          .toArray();
+        res.send(result);
+      }
+    );
 
     app.get("/orders/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
@@ -221,7 +261,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/order/:id", verifyJWT, async (req, res) => {
+    app.patch("/order/:id", verifyJWT, verifyLibrarian, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const statusUpdate = req.body;
@@ -234,8 +274,23 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/order-cancelled/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      // frontend থেকে পাঠানো field অনুযায়ী update
+      const updateDoc = { $set: { status: req.body.status } };
+
+      try {
+        const result = await orderCollection.updateOne(query, updateDoc);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Internal Server Error", error: err });
+      }
+    });
+
     //==== payment releted api ========//
-    app.post("/create-checkout-session", async (req, res) => {
+    app.post("/create-checkout-session", verifyJWT, async (req, res) => {
       const paymentInfo = req.body;
       const amount = parseInt(paymentInfo.price) * 100;
       const session = await stripe.checkout.sessions.create({
@@ -263,7 +318,7 @@ async function run() {
       res.send({ url: session.url });
     });
 
-    app.patch("/payment-success", async (req, res) => {
+    app.patch("/payment-success", verifyJWT, async (req, res) => {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -324,6 +379,11 @@ async function run() {
         .find({ customer_email: email })
         .sort({ payment_date: -1 })
         .toArray();
+      res.send(result);
+    });
+
+    app.get("/paymets-all", verifyJWT, verifyADMIN, async (req, res) => {
+      const result = await paymentCollection.find().toArray();
       res.send(result);
     });
 
