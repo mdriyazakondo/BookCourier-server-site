@@ -180,9 +180,10 @@ async function run() {
     });
 
     //====== Order Boook ========//
-    app.get("/orders", async (req, res) => {
+    app.get("/orders/:email/payments", async (req, res) => {
+      const email = req.params.email;
       const result = await orderCollection
-        .find({ paymentStatus: "paid" })
+        .find({ customerEmail: email, paymentStatus: "paid" })
         .toArray();
       res.send(result);
     });
@@ -201,6 +202,19 @@ async function run() {
       newOrder.paymentStatus = "unpaid";
       newOrder.order_date = new Date();
       const result = await orderCollection.insertOne(newOrder);
+      res.send(result);
+    });
+
+    app.patch("/order/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const statusUpdate = req.body;
+
+      const updateDoc = {
+        $set: { status: statusUpdate.status },
+      };
+
+      const result = await orderCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
