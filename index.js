@@ -241,7 +241,6 @@ async function run() {
         transationId: session.payment_intent,
       });
 
-      // If payment exists → prevent duplicate insert
       if (existingPayment) {
         return res.send({
           message: "Payment already processed",
@@ -257,6 +256,7 @@ async function run() {
           customer_email: session.customer_email,
           customer_name: books.customerName,
           payment_date: new Date(),
+          status: books.status,
           price: session.amount_total / 100,
         };
 
@@ -277,6 +277,16 @@ async function run() {
         transationId: session.payment_intent,
         orderId: result._id,
       });
+    });
+
+    //===== payment =======//
+    app.get("/payments/:email", async (req, res) => {
+      const email = req.params.email;
+      const result = await paymentCollection
+        .find({ customer_email: email })
+        .sort({ payment_date: -1 })
+        .toArray();
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
