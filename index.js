@@ -172,7 +172,6 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          create_date: new Date(),
           status: req.body.status,
         },
       };
@@ -181,6 +180,13 @@ async function run() {
     });
 
     //====== Order Boook ========//
+    app.get("/orders", async (req, res) => {
+      const result = await orderCollection
+        .find({ paymentStatus: "paid" })
+        .toArray();
+      res.send(result);
+    });
+
     app.get("/orders/:email", async (req, res) => {
       const email = req.params.email;
       const result = await orderCollection
@@ -253,6 +259,8 @@ async function run() {
           orderId: orderId,
           transationId: session.payment_intent,
           bookName: books.name,
+          authorName: books.authorName,
+          authorEmail: books.authorEmail,
           customer_email: session.customer_email,
           customer_name: books.customerName,
           payment_date: new Date(),
