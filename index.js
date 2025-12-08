@@ -34,11 +34,14 @@ const verifyJWT = async (req, res, next) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: [process.env.CLIENT_DOMIN],
+    origin: ["https://book-courier-client-site.vercel.app"],
+    // origin: ["http://localhost:5173"],
     credentials: true,
     optionSuccessStatus: 200,
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+// app.options("*", cors());
 
 //========= mongodb connect =========//
 const uri = process.env.MONGODB_URI;
@@ -158,12 +161,40 @@ async function run() {
     });
 
     //============ book create releted api ===========//
+    // app.get("/books", async (req, res) => {
+    //   const publish = "published";
+    //   const result = await bookCollection
+    //     .find({ status: publish })
+    //     .sort({ create_date: -1 })
+    //     .toArray();
+    //   res.send(result);
+    // });
     app.get("/books", async (req, res) => {
       const publish = "published";
+      const search = req.query.search || "";
+      const sort = req.query.sort || "";
+
+      let filter = {
+        status: publish,
+      };
+
+      if (search) {
+        filter.bookTitle = { $regex: search, $options: "i" };
+      }
+
+      let sortOption = {};
+      if (sort === "low-high") {
+        sortOption = { price: 1 };
+      } else if (sort === "high-low") {
+        sortOption = { price: -1 };
+      } else {
+        sortOption = { create_date: -1 };
+      }
       const result = await bookCollection
-        .find({ status: publish })
-        .sort({ create_date: -1 })
+        .find(filter)
+        .sort(sortOption)
         .toArray();
+
       res.send(result);
     });
 
@@ -312,8 +343,10 @@ async function run() {
         metadata: {
           orderId: paymentInfo._id,
         },
-        success_url: `${process.env.SITE_DOMIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.SITE_DOMIN}/dashboard/my-orders`,
+        // success_url: `http://localhost:5173/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        // cancel_url: `http://localhost:5173/dashboard/my-orders`,
+        success_url: `https://book-courier-client-site.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://book-courier-client-site.vercel.app/dashboard/my-orders`,
       });
       res.send({ url: session.url });
     });
@@ -395,7 +428,9 @@ async function run() {
   }
 }
 run().catch(console.dir);
-
+app.get("/", async (req, res) => {
+  res.send("server running successfully");
+});
 //========= port and litsene ========//
 const port = process.env.PORT || 5000;
 app.listen(port, () => {
