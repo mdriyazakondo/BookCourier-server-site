@@ -60,6 +60,7 @@ async function run() {
     const bookCollection = db.collection("books");
     const orderCollection = db.collection("orders");
     const paymentCollection = db.collection("payments");
+    const wishlistCollection = db.collection("wishlists");
 
     //======= Role Middleware ==========//
     const verifyADMIN = async (req, res, next) => {
@@ -414,6 +415,37 @@ async function run() {
 
     app.get("/paymets-all", verifyJWT, verifyADMIN, async (req, res) => {
       const result = await paymentCollection.find().toArray();
+      res.send(result);
+    });
+
+    //========= wishlist releted api =======//
+    app.get("/wish-list", verifyJWT, async (req, res) => {
+      const email = req.tokenEmail;
+      const result = await wishlistCollection
+        .find({ userEmail: email })
+        .sort({ wishList_date: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    app.post("/wish-list", async (req, res) => {
+      const newWishList = req.body;
+      const existingWishList = await wishlistCollection.findOne({
+        userEmail: newWishList.userEmail,
+        bookName: newWishList.bookName,
+      });
+      if (existingWishList) {
+        return res.send({ message: "already_exists" });
+      }
+      newWishList.wishList_date = new Date();
+      const result = await wishlistCollection.insertOne(newWishList);
+      res.send(result);
+    });
+
+    app.delete("/wish-list/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await wishlistCollection.deleteOne(query);
       res.send(result);
     });
 
