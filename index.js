@@ -355,12 +355,12 @@ async function run() {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-
       const orderId = session?.metadata?.orderId;
       const orderQuery = { _id: new ObjectId(orderId) };
 
       const books = await orderCollection.findOne(orderQuery);
 
+      // Already paid?
       const existingPayment = await paymentCollection.findOne({
         transationId: session.payment_intent,
       });
@@ -399,10 +399,7 @@ async function run() {
         });
       }
 
-      res.send({
-        transationId: session.payment_intent,
-        orderId: result._id,
-      });
+      return res.send({ message: "Payment not completed" });
     });
 
     //===== payment =======//
@@ -420,7 +417,7 @@ async function run() {
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
