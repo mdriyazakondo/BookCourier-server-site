@@ -61,6 +61,7 @@ async function run() {
     const orderCollection = db.collection("orders");
     const paymentCollection = db.collection("payments");
     const wishlistCollection = db.collection("wishlists");
+    const ratingCollection = db.collection("bookRatings");
 
     //======= Role Middleware ==========//
     const verifyADMIN = async (req, res, next) => {
@@ -447,6 +448,32 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await wishlistCollection.deleteOne(query);
       res.send(result);
+    });
+
+    // ====== Book Rating / Review Related API ====== //
+    app.get("/review/:bookId", async (req, res) => {
+      const { bookId } = req.params;
+      const query = { bookId: bookId };
+      const reviews = await ratingCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
+      res.send(reviews);
+    });
+
+    app.post("/review", async (req, res) => {
+      const review = req.body;
+      const existingRating = await ratingCollection.findOne({
+        bookId: review.bookId,
+      });
+      if (existingRating) {
+        return res.send({
+          message: "You have already submitted a review for this book",
+        });
+      }
+      review.date = new Date();
+      const result = await ratingCollection.insertOne(review);
+      res.send({ insertedId: result.insertedId });
     });
 
     // await client.db("admin").command({ ping: 1 });
