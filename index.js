@@ -41,7 +41,6 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-// app.options("*", cors());
 
 //========= mongodb connect =========//
 const uri = process.env.MONGODB_URI;
@@ -451,9 +450,10 @@ async function run() {
     });
 
     // ====== Book Rating / Review Related API ====== //
-    app.get("/review/:bookId", async (req, res) => {
-      const { bookId } = req.params;
-      const query = { bookId: bookId };
+    app.get("/review/:bookId", verifyJWT, async (req, res) => {
+      const bookId = req.params.bookId;
+      const email = req.tokenEmail;
+      const query = { email: email, bookId: bookId };
       const reviews = await ratingCollection
         .find(query)
         .sort({ date: -1 })
@@ -466,11 +466,7 @@ async function run() {
       const existingRating = await ratingCollection.findOne({
         bookId: review.bookId,
       });
-      if (existingRating) {
-        return res.send({
-          message: "You have already submitted a review for this book",
-        });
-      }
+
       review.date = new Date();
       const result = await ratingCollection.insertOne(review);
       res.send({ insertedId: result.insertedId });
