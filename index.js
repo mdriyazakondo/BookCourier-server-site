@@ -34,8 +34,8 @@ const verifyJWT = async (req, res, next) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: ["https://book-courier-client-site.vercel.app"],
-    // origin: ["http://localhost:5173"],
+    // origin: ["https://book-courier-client-site.vercel.app"],
+    origin: ["http://localhost:5173"],
     credentials: true,
     optionSuccessStatus: 200,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -301,6 +301,8 @@ async function run() {
       const updateDoc = {
         $set: { status: statusUpdate.status },
       };
+
+      await paymentCollection.updateOne({ orderId: id }, updateDoc);
 
       const result = await orderCollection.updateOne(query, updateDoc);
       res.send(result);
