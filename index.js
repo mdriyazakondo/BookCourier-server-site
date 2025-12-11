@@ -82,8 +82,8 @@ async function run() {
       next();
     };
 
-    //========= User api ============// !! TODO
-    app.get("/all-users/:email", verifyJWT, async (req, res) => {
+    //========= User api ============//
+    app.get("/all-users/:email", verifyJWT, verifyADMIN, async (req, res) => {
       const adminEmail = req.params.email;
       const result = await userCollection
         .find({ email: { $ne: adminEmail } })
@@ -91,7 +91,7 @@ async function run() {
       res.send(result);
     });
 
-    // GET /user/role?email=user@example.com
+    // GET  user role
     app.get("/user/role", async (req, res) => {
       const email = req.query.email;
       if (!email) return res.status(400).send({ error: "Email is required" });
@@ -161,15 +161,6 @@ async function run() {
       res.send(result);
     });
 
-    //============ book create releted api ===========//
-    // app.get("/books", async (req, res) => {
-    //   const publish = "published";
-    //   const result = await bookCollection
-    //     .find({ status: publish })
-    //     .sort({ create_date: -1 })
-    //     .toArray();
-    //   res.send(result);
-    // });
     app.get("/books", async (req, res) => {
       const publish = "published";
       const search = req.query.search || "";
@@ -249,7 +240,7 @@ async function run() {
       res.send(result);
     });
 
-    //==== publish and unpublish =========// !! TODO
+    //==== publish and unpublish =========//
     app.patch("/books/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
