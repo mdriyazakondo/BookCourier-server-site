@@ -217,6 +217,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/update-book/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await bookCollection.findOne(query);
+      res.send(result);
+    });
+
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const newBook = req.body;
       newBook.create_date = new Date();
