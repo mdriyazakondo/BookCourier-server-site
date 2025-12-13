@@ -243,6 +243,10 @@ async function run() {
     app.delete("/books/:id", verifyJWT, verifyLibrarian, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
+      const existingData = await bookCollection.findOne(query);
+      if (existingData.status === "published") {
+        return res.send({ message: "book is published not delete" });
+      }
       const result = await bookCollection.deleteOne(query);
       res.send(result);
     });
@@ -388,6 +392,10 @@ async function run() {
         };
 
         const result = await paymentCollection.insertOne(orderInfo);
+
+        // await bookCollection.updateOne(orderQuery, {
+        //   $inc: { stockQuantity: -1 },
+        // });
 
         await orderCollection.updateOne(orderQuery, {
           $set: { paymentStatus: session.payment_status },
